@@ -1,0 +1,8 @@
+[package]
+name = "candle-usage"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+candle-nn = { workspace = true }
+candle-core = { workspace = true }
