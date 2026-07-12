@@ -7,6 +7,9 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+mod chat_web;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RequestPayload {
@@ -39,7 +42,9 @@ async fn echo(Json(payload): Json<RequestPayload>) -> impl IntoResponse {
 async fn main() {
     let app = Router::new()
         .route("/health", get(health))
-        .route("/echo", post(echo));
+        .route("/echo", post(echo))
+        .route("/v1/chat/completions", post(chat_completions))
+        .merge(chat_web::routes());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("Server listening on {}", addr);
@@ -49,6 +54,93 @@ async fn main() {
         .expect("Failed to bind to address");
 
     axum::serve(listener, app).await.expect("Server failed");
+}
+
+// ── OpenAI-compatible Chat Completion types ──
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChatMessage {
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChatCompletionRequest {
+    pub model: String,
+    pub messages: Vec<ChatMessage>,
+    #[serde(default)]
+    pub temperature: Option<f32>,
+    #[serde(default)]
+    pub max_tokens: Option<u32>,
+    #[serde(default)]
+    pub stream: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChatCompletionResponse {
+    pub id: String,
+    pub object: String,
+    pub created: u64,
+    pub model: String,
+    pub choices: Vec<Choice>,
+    pub usage: Usage,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Choice {
+    pub index: u32,
+    pub message: ChatMessage,
+    pub finish_reason: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Usage {
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
+}
+
+// Chat completions endpoint — echoes the last user message for now
+async fn chat_completions(Json(req): Json<ChatCompletionRequest>) -> impl IntoResponse {
+    let last_user = req
+        .messages
+        .iter()
+        .rev()
+        .find(|m| m.role == "user")
+        .map(|m| m.content.clone())
+        .unwrap_or_default();
+
+    let response = ChatCompletionResponse {
+        id: format!("chatcmpl-{:x}", rand_id()),
+        object: "chat.completion".into(),
+        created: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+        model: req.model,
+        choices: vec![Choice {
+            index: 0,
+            message: ChatMessage {
+                role: "assistant".into(),
+                content: last_user,
+            },
+            finish_reason: "stop".into(),
+        }],
+        usage: Usage {
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+        },
+    };
+
+    (StatusCode::OK, Json(response))
+}
+
+fn rand_id() -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    SystemTime::now().hash(&mut hasher);
+    hasher.finish()
 }
 
 #[cfg(test)]
@@ -123,5 +215,90 @@ mod tests {
         };
         assert_eq!(response.processed_value, 84);
         assert_eq!(response.result, "Received: test");
+    }
+
+    // ── OpenAI Chat Completion tests ──
+
+    #[test]
+    fn test_chat_completion_request_serialization() {
+        let req = ChatCompletionRequest {
+            model: "gpt-3.5-turbo".into(),
+            messages: vec![
+                ChatMessage {
+                    role: "system".into(),
+                    content: "You are helpful.".into(),
+                },
+                ChatMessage {
+                    role: "user".into(),
+                    content: "Hello!".into(),
+                },
+            ],
+            temperature: Some(0.7),
+            max_tokens: Some(100),
+            stream: Some(false),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("gpt-3.5-turbo"));
+        assert!(json.contains("Hello!"));
+    }
+
+    #[test]
+    fn test_chat_completion_deserialization() {
+        let json = r#"{
+            "model": "gpt-4",
+            "messages": [{"role": "user", "content": "ping"}]
+        }"#;
+        let req: ChatCompletionRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.model, "gpt-4");
+        assert_eq!(req.messages.len(), 1);
+        assert_eq!(req.messages[0].content, "ping");
+        assert!(req.temperature.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_chat_completions_echoes_last_user() {
+        let req = ChatCompletionRequest {
+            model: "gpt-3.5-turbo".into(),
+            messages: vec![
+                ChatMessage {
+                    role: "system".into(),
+                    content: "ignore".into(),
+                },
+                ChatMessage {
+                    role: "user".into(),
+                    content: "What is Rust?".into(),
+                },
+            ],
+            temperature: None,
+            max_tokens: None,
+            stream: None,
+        };
+        let resp = chat_completions(Json(req)).await.into_response();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_chat_completions_response_body() {
+        let req = ChatCompletionRequest {
+            model: "gpt-4".into(),
+            messages: vec![ChatMessage {
+                role: "user".into(),
+                content: "hello world".into(),
+            }],
+            temperature: None,
+            max_tokens: None,
+            stream: None,
+        };
+        let resp = chat_completions(Json(req)).await;
+        let (parts, body) = resp.into_response().into_parts();
+        assert_eq!(parts.status, StatusCode::OK);
+        let body: ChatCompletionResponse =
+            serde_json::from_slice(&axum::body::to_bytes(body, usize::MAX).await.unwrap()).unwrap();
+        assert_eq!(body.object, "chat.completion");
+        assert_eq!(body.choices.len(), 1);
+        assert_eq!(body.choices[0].message.role, "assistant");
+        assert_eq!(body.choices[0].message.content, "hello world");
+        assert_eq!(body.choices[0].finish_reason, "stop");
+        assert!(body.id.starts_with("chatcmpl-"));
     }
 }
