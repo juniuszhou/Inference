@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct TransformerCasualLLMConfig {
     pub d_model: usize,
     pub n_heads: usize,

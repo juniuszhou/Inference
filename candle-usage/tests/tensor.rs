@@ -31,3 +31,14 @@ fn test_tensor() -> candle_core::Result<()> {
     assert_eq!(tensor.to_vec1::<f32>()?, vec![1.0f32, 2.0, 3.0, 4.0]);
     Ok(())
 }
+
+#[test]
+fn test_tensor_2() -> candle_core::Result<()> {
+    let device = Device::Cuda(CudaDevice::new_with_stream(0)?);
+
+    let tensor = Tensor::from_vec(vec![1.0f32, 2.0, 3.0, 4.0], (2, 2), &device)?;
+    println!("tensor: {:?}", tensor.dims());
+    assert_eq!(tensor.dims(), &[2, 2]);
+
+    Ok(())
+}
