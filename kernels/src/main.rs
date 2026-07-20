@@ -1,10 +1,8 @@
-use cuda_core::launch_kernel_on_stream;
-use cuda_core::{CudaContext, DeviceBuffer};
+use cuda_core::{CudaContext, DeviceBuffer, launch_kernel_on_stream};
 use std::ffi::c_void;
-use std::sync::Arc;
 
 fn main() {
-    let ctx = Arc::new(CudaContext::new(0).expect("Failed to create CUDA context"));
+    let ctx = CudaContext::new(0).expect("Failed to create CUDA context");
     let stream = ctx.default_stream();
 
     const N: usize = 1024;

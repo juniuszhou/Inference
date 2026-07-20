@@ -3,4 +3,18 @@ name = "kernels"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "kernels"
+path = "src/main.rs"
+
+[[bin]]
+name = "cudarc_call"
+path = "src/cudarc_call.rs"
+
 [dependencies]
+cuda-core = { git = "https://github.com/NVlabs/cuda-oxide.git" }
+cudarc = { version = "0.19.8", features = ["cuda-12000"] }
+anyhow = "1.0.97"
+
+[build-dependencies]
+cudaforge = "0.1.2"
