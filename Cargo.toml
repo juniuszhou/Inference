@@ -1,5 +1,5 @@
 [workspace]
-members = ["candle-usage", "server"]
+members = ["candle-usage", "server", "models", "kernels"]
 resolver = "2"
 
 [workspace.dependencies]
