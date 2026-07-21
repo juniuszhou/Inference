@@ -15,3 +15,8 @@ path = "src/main.rs"
 candle-nn = { workspace = true }
 candle-core = { workspace = true }
 clap = { version = "4", features = ["derive"] }
+hf-hub = "0.5.0"
+parquet = "59"
+arrow = "59"
+anyhow = "1.0.0"
+tokenizers = { version = "0.21", features = ["http"] }

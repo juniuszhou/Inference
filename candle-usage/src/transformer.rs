@@ -55,15 +55,18 @@ impl MultiheadAttention {
 
         let q = q
             .reshape((b_sz, seq_len, self.num_heads, self.head_dim))?
-            .transpose(1, 2)?;
+            .transpose(1, 2)?
+            .contiguous()?;
         let k = k
             .reshape((b_sz, seq_len, self.num_heads, self.head_dim))?
-            .transpose(1, 2)?;
+            .transpose(1, 2)?
+            .contiguous()?;
         let v = v
             .reshape((b_sz, seq_len, self.num_heads, self.head_dim))?
-            .transpose(1, 2)?;
+            .transpose(1, 2)?
+            .contiguous()?;
 
-        let attn_weights = q.matmul(&k.transpose(2, 3)?)?;
+        let attn_weights = q.matmul(&k.transpose(2, 3)?.contiguous()?)?;
         let attn_weights = (attn_weights * self.scale)?;
         let attn_weights = attn_weights.broadcast_add(mask)?;
         let attn_weights = candle_nn::ops::softmax(&attn_weights, D::Minus1)?;
