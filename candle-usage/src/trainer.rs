@@ -68,78 +68,74 @@ impl Trainer {
                 .column_by_name("text")
                 .ok_or_else(|| candle_core::Error::Msg("No 'text' column".to_string()))?;
 
-            let ids: Vec<u32> = if let Some(arr) = col.as_any().downcast_ref::<StringArray>() {
-                let mut ids = Vec::new();
+            let mut process_row = |row_text: &str| -> Result<(), candle_core::Error> {
+                let enc = tokenizer
+                    .encode(row_text, true)
+                    .map_err(|e| candle_core::Error::Msg(format!("Tokenize error: {e}")))?;
+                let ids = enc.get_ids();
+                if ids.is_empty() {
+                    return Ok(());
+                }
+                let num_steps = ids.len().saturating_sub(1) / stride;
+                for _step in 0..num_steps {
+                    let start = _step * stride;
+                    let end = (start + seq_len + 1).min(ids.len());
+                    let tokens = &ids[start..end];
+                    if tokens.len() < 2 {
+                        break;
+                    }
+
+                    let input_part = &tokens[..tokens.len().min(seq_len)];
+                    let target_part = &tokens[1..tokens.len().min(seq_len + 1)];
+
+                    let mut input_ids = input_part.to_vec();
+                    let mut target_ids: Vec<u32> = target_part.to_vec();
+                    while input_ids.len() < seq_len {
+                        input_ids.push(pad_id);
+                        target_ids.push(0);
+                    }
+
+                    let input_tensor =
+                        Tensor::new(input_ids.as_slice(), &self.device)?.unsqueeze(0)?;
+                    let target_tensor =
+                        Tensor::new(target_ids.as_slice(), &self.device)?.unsqueeze(0)?;
+
+                    let logits = self.transformer.forward(&input_tensor)?;
+
+                    let (b, s, _) = logits.shape().dims3()?;
+                    let logits_2d = logits.reshape((b * s, vocab_size))?;
+                    let target_1d = target_tensor.flatten_all()?;
+
+                    let loss_value = loss::cross_entropy(&logits_2d, &target_1d)?;
+                    optim.backward_step(&loss_value)?;
+
+                    let loss_scalar = loss_value.to_scalar::<f32>()?;
+                    let ppl = loss_scalar.exp();
+
+                    eprintln!("step {global_step}: loss = {loss_scalar:.4}, perplexity = {ppl:.4}");
+                    global_step += 1;
+                }
+                Ok(())
+            };
+
+            if let Some(arr) = col.as_any().downcast_ref::<StringArray>() {
                 for i in 0..arr.len() {
                     if arr.is_null(i) {
                         continue;
                     }
-                    let enc = tokenizer
-                        .encode(arr.value(i), true)
-                        .map_err(|e| candle_core::Error::Msg(format!("Tokenize error: {e}")))?;
-                    ids.extend(enc.get_ids());
+                    process_row(arr.value(i))?;
                 }
-                ids
             } else if let Some(arr) = col.as_any().downcast_ref::<LargeStringArray>() {
-                let mut ids = Vec::new();
                 for i in 0..arr.len() {
                     if arr.is_null(i) {
                         continue;
                     }
-                    let enc = tokenizer
-                        .encode(arr.value(i), true)
-                        .map_err(|e| candle_core::Error::Msg(format!("Tokenize error: {e}")))?;
-                    ids.extend(enc.get_ids());
+                    process_row(arr.value(i))?;
                 }
-                ids
             } else {
                 return Err(candle_core::Error::Msg(
                     "'text' column is not a string array".to_string(),
                 ));
-            };
-
-            if ids.is_empty() {
-                continue;
-            }
-
-            let num_steps = ids.len().saturating_sub(1) / stride;
-
-            for _step in 0..num_steps {
-                let start = _step * stride;
-                let end = (start + seq_len + 1).min(ids.len());
-                let tokens = &ids[start..end];
-                if tokens.len() < 2 {
-                    break;
-                }
-
-                let input_part = &tokens[..tokens.len().min(seq_len)];
-                let target_part = &tokens[1..tokens.len().min(seq_len + 1)];
-
-                let mut input_ids = input_part.to_vec();
-                let mut target_ids: Vec<u32> = target_part.to_vec();
-                while input_ids.len() < seq_len {
-                    input_ids.push(pad_id);
-                    target_ids.push(0);
-                }
-
-                let input_tensor = Tensor::new(input_ids.as_slice(), &self.device)?.unsqueeze(0)?;
-                let target_tensor =
-                    Tensor::new(target_ids.as_slice(), &self.device)?.unsqueeze(0)?;
-
-                let logits = self.transformer.forward(&input_tensor)?;
-
-                let (b, s, _) = logits.shape().dims3()?;
-                let logits_2d = logits.reshape((b * s, vocab_size))?;
-                let target_1d = target_tensor.flatten_all()?;
-
-                let loss_value = loss::cross_entropy(&logits_2d, &target_1d)?;
-                optim.backward_step(&loss_value)?;
-
-                let loss_scalar = loss_value.to_scalar::<f32>()?;
-                let ppl = loss_scalar.exp();
-
-                eprintln!("step {global_step}: loss = {loss_scalar:.4}, perplexity = {ppl:.4}");
-                global_step += 1;
             }
         }
 

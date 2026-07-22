@@ -18,7 +18,7 @@ fn test_cudarc_call() -> Result<(), Box<dyn std::error::Error>> {
     let stream = ctx.default_stream();
 
     // Load the pre-compiled PTX from the build script (OUT_DIR)
-    let ptx_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/vecadd.ptx"));
+    let ptx_bytes = include_bytes!("../../vecadd.ptx");
     let ptx_src = CString::new(ptx_bytes as &[u8])?;
     let ptx = cudarc::nvrtc::Ptx::from_src(ptx_src.into_string()?);
 

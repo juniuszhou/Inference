@@ -25,6 +25,8 @@ fn test_load_dataset_from_huggingface() {
         .expect("failed to create parquet reader builder");
     let reader = builder.build().expect("failed to build parquet reader");
 
+    // println!("reader: {:?}", &reader.as_ref().count());
+
     for (_i, batch_result) in reader.enumerate().take(1) {
         let batch = batch_result.expect("failed to read batch");
         let num_rows = batch.num_rows();
