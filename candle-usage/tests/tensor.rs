@@ -1,4 +1,4 @@
-use candle_core::{CudaDevice, Device, Tensor};
+use candle_core::{CudaDevice, Device, StreamTensor, Tensor};
 
 /*
 Cheatsheet:
@@ -35,10 +35,30 @@ fn test_tensor() -> candle_core::Result<()> {
 #[test]
 fn test_tensor_2() -> candle_core::Result<()> {
     let device = Device::Cuda(CudaDevice::new_with_stream(0)?);
-
     let tensor = Tensor::from_vec(vec![1.0f32, 2.0, 3.0, 4.0], (2, 2), &device)?;
     println!("tensor: {:?}", tensor.dims());
     assert_eq!(tensor.dims(), &[2, 2]);
+
+    Ok(())
+}
+
+#[test]
+fn test_tensor_3() -> candle_core::Result<()> {
+    // let device = Device::Cuda(CudaDevice::new_with_stream(0)?);
+    let tensor = StreamTensor::from(None);
+    println!("tensor: {:?}", tensor.shape());
+
+    Ok(())
+}
+
+#[test]
+fn test_tensor_4() -> candle_core::Result<()> {
+    let device = Device::Cuda(CudaDevice::new_with_stream(0)?);
+    let a = Tensor::new(&[[0f32, 1., 2.], [3., 4., 5.], [6., 7., 8.]], &device)?;
+
+    let b = a.narrow(0, 1, 2)?;
+    assert_eq!(b.shape().dims(), &[2, 3]);
+    assert_eq!(b.to_vec2::<f32>()?, &[[3., 4., 5.], [6., 7., 8.]]);
 
     Ok(())
 }

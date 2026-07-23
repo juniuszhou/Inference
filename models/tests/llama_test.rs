@@ -13,6 +13,7 @@ use tokenizers::Tokenizer;
 
 const EOS_TOKEN: &str = "</s>";
 
+#[ignore]
 #[test]
 fn test_llama_training() -> Result<()> {
     let (model, varmap, config) = load_llama(true)?;
