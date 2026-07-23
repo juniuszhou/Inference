@@ -1,0 +1,18 @@
+[package]
+name = "models"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokenizers = { version = "0.22", features = ["http"] }
+candle-nn = { workspace = true, features = ["cuda"] }
+candle-transformers = { workspace = true, features = ["cuda"] }
+candle-core = { workspace = true, features = ["cuda"] }
+anyhow = "1.0"
+hf-hub = "0.5"
+
+[dev-dependencies]
+candle-usage = { path = "../candle-usage" }
+arrow = { version = "59", features = ["ipc"] }
+tokenizers = "0.22"
+parquet = "59"
