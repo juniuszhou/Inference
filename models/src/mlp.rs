@@ -3,12 +3,14 @@ use candle_nn::Linear;
 use candle_nn::VarBuilder;
 use candle_nn::linear as linear_fn;
 
+#[allow(dead_code)]
 pub struct Mlp {
     up_proj: Linear,
     down_proj: Linear,
     activation: Activation,
 }
 
+#[allow(dead_code)]
 impl Mlp {
     fn new(d_model: usize, d_ff: usize, vb: VarBuilder) -> Self {
         Self {

@@ -1,0 +1,67 @@
+#include <cuda_runtime.h>
+#include <stdio.h>
+
+__global__ void add1D(float* a, float* b, float* c, int N) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < N) {
+        c[idx] = a[idx] + b[idx];
+    }
+}
+
+int main() {
+    int N = 1 << 20;  // 约 100 万元素
+    size_t size = N * sizeof(float);
+
+    float *h_a, *h_b, *h_c;
+    float *d_a, *d_b, *d_c;
+
+    // 主机内存
+    h_a = (float*)malloc(size);
+    h_b = (float*)malloc(size);
+    h_c = (float*)malloc(size);
+
+    // 初始化数据
+    for (int i = 0; i < N; i++) {
+        h_a[i] = i;
+        h_b[i] = i * 2;
+    }
+
+    // 设备内存
+    cudaMalloc(&d_a, size);
+    cudaMalloc(&d_b, size);
+    cudaMalloc(&d_c, size);
+
+    cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice);
+
+    // Kernel 配置 with 1D
+    dim3 block(256);
+    dim3 grid((N + block.x - 1) / block.x);
+
+    // 启动 Kernel
+    add1D<<<grid, block>>>(d_a, d_b, d_c, N);
+
+    // 同步并检查错误
+    cudaDeviceSynchronize();
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA Error: %s\n", cudaGetErrorString(err));
+    }
+
+    // 结果拷回主机
+    cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
+
+    // 验证前 10 个结果
+    printf("First 10 results:\n");
+    for (int i = 0; i < 10; i++) {
+        printf("%d + %d*2 = %f\n", i, i, h_c[i]);
+    }
+
+    // 清理内存
+    free(h_a); free(h_b); free(h_c);
+    cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
+
+    printf("Done! Grid = %d, Block = %d\n", grid.x, block.x);
+    return 0;
+}
+

@@ -14,49 +14,10 @@ use candle_transformers::models::quantized_llama::ModelWeights;
 pub use gguf::*;
 use tokenizers::tokenizer::Tokenizer;
 
-/// Holds the golden model weights (immutable after load), device, and tokenizer.
-/// `ModelWeights::clone` shares the underlying weight data via ref-counting
-/// while giving each clone its own empty KV cache — so spawning sessions is cheap.
-pub struct SharedModelWeights {
-    weights: ModelWeights,
-    device: Device,
-    pub tokenizer: Tokenizer,
-}
-
-impl SharedModelWeights {
-    pub fn new() -> Result<Self> {
-        let (weights, device) = get_model()?;
-
-        let model_path = std::path::Path::new(MODEL_PATH);
-        let mut file = std::fs::File::open(model_path)?;
-        let content = gguf_file::Content::read(&mut file)?;
-        let tokenizer = TokenizerFromGguf::from_gguf(&content)
-            .map_err(|e| anyhow::Error::msg(e.to_string()))?;
-
-        Ok(Self {
-            weights,
-            device,
-            tokenizer,
-        })
-    }
-
-    /// Spawn a per-request [`InferenceEngine`] that shares the weight data
-    /// with this [`SharedModelWeights`] but has its own fresh KV cache.
-    pub fn new_session(
-        &self,
-        seed: u64,
-        temperature: Option<f64>,
-        top_p: Option<f64>,
-    ) -> InferenceEngine {
-        InferenceEngine {
-            model: self.weights.clone(),
-            logits_processor: LogitsProcessor::new(seed, temperature, top_p),
-        }
-    }
-}
-
 pub struct InferenceEngine {
     pub model: ModelWeights,
+    pub device: Device,
+    pub tokenizer: Tokenizer,
     pub logits_processor: LogitsProcessor,
 }
 
@@ -65,79 +26,93 @@ const CHAT_TEMPLATE: &str = "\
 {prompt}\
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";
 
-pub fn serve(shared: &SharedModelWeights, prompt: &str, max_tokens: usize) -> Result<String> {
-    let mut engine = shared.new_session(299792458, Some(0.7), Some(0.9));
+impl InferenceEngine {
+    pub fn new(seed: u64, temperature: Option<f64>, top_p: Option<f64>) -> Self {
+        let (weights, device) = get_model().expect("failed to get model");
 
-    let formatted = CHAT_TEMPLATE.replace("{prompt}", prompt);
-    let mut tokens = shared
-        .tokenizer
-        .encode(formatted.as_str(), false)
-        .map_err(|e| anyhow::Error::msg(e))?
-        .get_ids()
-        .to_vec();
-    let prompt_len = tokens.len();
+        let model_path = std::path::Path::new(MODEL_PATH);
+        let mut file = std::fs::File::open(model_path).expect("failed to open model file");
+        let content = gguf_file::Content::read(&mut file).expect("failed to read model file");
+        let tokenizer = TokenizerFromGguf::from_gguf(&content)
+            .map_err(|e| anyhow::Error::msg(e.to_string()))
+            .expect("failed to create tokenizer");
 
-    let input = Tensor::new(tokens.as_slice(), &shared.device)
-        .map_err(|e| anyhow::Error::msg(e))?
-        .unsqueeze(0)?;
-    let logits = engine
-        .model
-        .forward(&input, 0)
-        .map_err(|e| anyhow::Error::msg(e))?;
-    let logits = logits.squeeze(0).map_err(|e| anyhow::Error::msg(e))?;
-    let mut next_token = engine
-        .logits_processor
-        .sample(&logits)
-        .map_err(|e| anyhow::Error::msg(e))?;
-    tokens.push(next_token);
-
-    let eos_id = shared.tokenizer.token_to_id("<|eot_id|>").unwrap_or(2);
-
-    for i in 1..max_tokens {
-        let input = Tensor::new(&[next_token], &shared.device)
-            .map_err(|e| anyhow::Error::msg(e))?
-            .unsqueeze(0)?;
-        let logits = engine
-            .model
-            .forward(&input, prompt_len + i - 1)
-            .map_err(|e| anyhow::Error::msg(e))?;
-        let logits = logits.squeeze(0).map_err(|e| anyhow::Error::msg(e))?;
-
-        next_token = engine
-            .logits_processor
-            .sample(&logits)
-            .map_err(|e| anyhow::Error::msg(e))?;
-
-        tokens.push(next_token);
-
-        if next_token == eos_id {
-            break;
+        Self {
+            model: weights,
+            device,
+            tokenizer,
+            logits_processor: LogitsProcessor::new(seed, temperature, top_p),
         }
     }
 
-    let output = shared
-        .tokenizer
-        .decode(&tokens, true)
-        .map_err(|e| anyhow::Error::msg(e))?;
+    pub fn serve(&mut self, prompt: &str, max_tokens: usize) -> Result<String> {
+        // let mut engine = self.shared.new_session(299792458, Some(0.7), Some(0.9));
 
-    Ok(output)
+        let formatted = CHAT_TEMPLATE.replace("{prompt}", prompt);
+        let mut tokens = self
+            .tokenizer
+            .encode(formatted.as_str(), false)
+            .map_err(anyhow::Error::msg)?
+            .get_ids()
+            .to_vec();
+        let prompt_len = tokens.len();
+
+        let input = Tensor::new(tokens.as_slice(), &self.device)
+            .map_err(anyhow::Error::msg)?
+            .unsqueeze(0)?;
+        let logits = self.model.forward(&input, 0).map_err(anyhow::Error::msg)?;
+        let logits = logits.squeeze(0).map_err(anyhow::Error::msg)?;
+        let mut next_token = self
+            .logits_processor
+            .sample(&logits)
+            .map_err(anyhow::Error::msg)?;
+        tokens.push(next_token);
+
+        let eos_id = self.tokenizer.token_to_id("<|eot_id|>").unwrap_or(2);
+
+        for i in 1..max_tokens {
+            let input = Tensor::new(&[next_token], &self.device)
+                .map_err(anyhow::Error::msg)?
+                .unsqueeze(0)?;
+            let logits = self
+                .model
+                .forward(&input, prompt_len + i - 1)
+                .map_err(anyhow::Error::msg)?;
+            let logits = logits.squeeze(0).map_err(anyhow::Error::msg)?;
+
+            next_token = self
+                .logits_processor
+                .sample(&logits)
+                .map_err(anyhow::Error::msg)?;
+
+            tokens.push(next_token);
+
+            if next_token == eos_id {
+                break;
+            }
+        }
+
+        let output = self
+            .tokenizer
+            .decode(&tokens, true)
+            .map_err(anyhow::Error::msg)?;
+
+        Ok(output)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn new_engine() -> InferenceEngine {
+        InferenceEngine::new(299792458, Some(0.7), Some(0.9))
+    }
+
     #[test]
     fn test_serve_generates_text() {
-        let shared = match SharedModelWeights::new() {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("skipping test: failed to create SharedModelWeights: {e}");
-                return;
-            }
-        };
-
-        let result = serve(&shared, "What is the capital of France?", 50);
+        let mut engine = new_engine();
+        let result = engine.serve("What is the capital of France?", 50);
         assert!(result.is_ok(), "serve failed: {:?}", result.err());
         let text = result.unwrap();
         assert!(!text.is_empty(), "generated text should not be empty");
@@ -150,15 +125,7 @@ mod tests {
 
     #[test]
     fn test_concurrent_serve() {
-        let shared = match SharedModelWeights::new() {
-            Ok(s) => std::sync::Arc::new(s),
-            Err(e) => {
-                eprintln!("skipping test: failed to create SharedModelWeights: {e}");
-                return;
-            }
-        };
-
-        let mutex = std::sync::Arc::new(std::sync::Mutex::new(()));
+        let engine = std::sync::Arc::new(std::sync::Mutex::new(new_engine()));
 
         let n_requests = 4;
         let prompts = vec![
@@ -172,14 +139,13 @@ mod tests {
         let start = std::time::Instant::now();
 
         for i in 0..n_requests {
-            let shared = std::sync::Arc::clone(&shared);
-            let mutex = std::sync::Arc::clone(&mutex);
+            let engine = std::sync::Arc::clone(&engine);
             let prompt = prompts[i].to_string();
             handles.push(std::thread::spawn(move || {
                 let t0 = std::time::Instant::now();
-                let _guard = mutex.lock().unwrap();
-                let result = serve(&shared, &prompt, 50);
-                drop(_guard);
+                let mut guard = engine.lock().unwrap();
+                let result = guard.serve(&prompt, 50);
+                drop(guard);
                 let elapsed = t0.elapsed();
                 (i, prompt, result, elapsed)
             }));
@@ -209,7 +175,6 @@ mod tests {
         }
 
         let total_wall = start.elapsed();
-        // With serialization via Mutex, wall time ≈ sum of individual times
         println!(
             "Total: {n_requests} requests, wall={:.3}s, sum_of_model_time={:.3}s, \
              avg_per_request={:.3}s, total_chars={total_generated}",

@@ -5,11 +5,14 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use log;
+use models::InferenceEngine;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
-
 mod chat_web;
+use axum::extract::State;
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RequestPayload {
@@ -38,12 +41,22 @@ async fn echo(Json(payload): Json<RequestPayload>) -> impl IntoResponse {
     (StatusCode::OK, Json(response))
 }
 
+struct AppState {
+    engine: tokio::sync::Mutex<InferenceEngine>,
+}
+
 #[tokio::main]
 async fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    let shared = Arc::new(AppState {
+        engine: tokio::sync::Mutex::new(InferenceEngine::new(299792458, Some(0.7), Some(0.9))),
+    });
+
     let app = Router::new()
         .route("/health", get(health))
         .route("/echo", post(echo))
         .route("/v1/chat/completions", post(chat_completions))
+        .with_state(shared)
         .merge(chat_web::routes());
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -101,7 +114,10 @@ pub struct Usage {
 }
 
 // Chat completions endpoint — echoes the last user message for now
-async fn chat_completions(Json(req): Json<ChatCompletionRequest>) -> impl IntoResponse {
+async fn chat_completions(
+    state: State<Arc<AppState>>,
+    req: Json<ChatCompletionRequest>,
+) -> impl IntoResponse {
     let last_user = req
         .messages
         .iter()
@@ -110,6 +126,16 @@ async fn chat_completions(Json(req): Json<ChatCompletionRequest>) -> impl IntoRe
         .map(|m| m.content.clone())
         .unwrap_or_default();
 
+    // remove the "user" prefix
+    let content = last_user[4..].to_string();
+
+    log::info!("Last user message: {}", content);
+
+    let mut engine = state.engine.lock().await;
+    let result = engine.serve(&content, 100);
+
+    log::info!("Result: {:?}", result);
+
     let response = ChatCompletionResponse {
         id: format!("chatcmpl-{:x}", rand_id()),
         object: "chat.completion".into(),
@@ -117,12 +143,12 @@ async fn chat_completions(Json(req): Json<ChatCompletionRequest>) -> impl IntoRe
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs(),
-        model: req.model,
+        model: req.model.clone(),
         choices: vec![Choice {
             index: 0,
             message: ChatMessage {
                 role: "assistant".into(),
-                content: last_user,
+                content: result.unwrap_or("server error".to_string()),
             },
             finish_reason: "stop".into(),
         }],
