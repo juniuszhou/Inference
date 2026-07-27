@@ -5,15 +5,15 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use log;
-use models::InferenceEngine;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
 mod chat_web;
 use axum::extract::State;
+use models::{InferenceEngine, ProcessRequest};
 use std::sync::Arc;
-
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RequestPayload {
     pub message: String,
@@ -42,14 +42,20 @@ async fn echo(Json(payload): Json<RequestPayload>) -> impl IntoResponse {
 }
 
 struct AppState {
-    engine: tokio::sync::Mutex<InferenceEngine>,
+    // engine: tokio::sync::Mutex<InferenceEngine>,
+    tx: mpsc::Sender<ProcessRequest>,
 }
 
 #[tokio::main]
 async fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    let shared = Arc::new(AppState {
-        engine: tokio::sync::Mutex::new(InferenceEngine::new(299792458, Some(0.7), Some(0.9))),
+    let (tx, rx) = mpsc::channel::<ProcessRequest>(1024);
+
+    let shared = Arc::new(AppState { tx });
+
+    let mut engine = InferenceEngine::new(299792458, Some(0.7), Some(0.9), rx);
+    tokio::spawn(async move {
+        engine.start().await;
     });
 
     let app = Router::new()
@@ -126,15 +132,36 @@ async fn chat_completions(
         .map(|m| m.content.clone())
         .unwrap_or_default();
 
-    // remove the "user" prefix
-    let content = last_user[4..].to_string();
+    let content = last_user;
 
     log::info!("Last user message: {}", content);
+    let (resp_tx, resp_rx) = oneshot::channel();
+    let process_req = ProcessRequest {
+        data: content,
+        responder: resp_tx,
+    };
 
-    let mut engine = state.engine.lock().await;
-    let result = engine.serve(&content, 100);
+    if state.tx.send(process_req).await.is_err() {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Backend is shutting down".to_string(),
+        )
+            .into_response();
+    }
 
-    log::info!("Result: {:?}", result);
+    let result = match resp_rx.await {
+        Ok(Ok(resp)) => resp.result,
+        Ok(Err(e)) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, e).into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Backend dropped the request".to_string(),
+            )
+                .into_response();
+        }
+    };
 
     let response = ChatCompletionResponse {
         id: format!("chatcmpl-{:x}", rand_id()),
@@ -148,7 +175,7 @@ async fn chat_completions(
             index: 0,
             message: ChatMessage {
                 role: "assistant".into(),
-                content: result.unwrap_or("server error".to_string()),
+                content: result,
             },
             finish_reason: "stop".into(),
         }],
@@ -159,7 +186,7 @@ async fn chat_completions(
         },
     };
 
-    (StatusCode::OK, Json(response))
+    (StatusCode::OK, Json(response)).into_response()
 }
 
 fn rand_id() -> u64 {
@@ -172,6 +199,7 @@ fn rand_id() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use models::ProcessResponse;
 
     #[test]
     fn test_request_payload_creation() {
@@ -283,6 +311,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_chat_completions_echoes_last_user() {
+        let (tx, mut rx) = mpsc::channel::<ProcessRequest>(1024);
+        tokio::spawn(async move {
+            while let Some(req) = rx.recv().await {
+                let _ = req.responder.send(Ok(ProcessResponse {
+                    result: req.data.clone(),
+                }));
+            }
+        });
+        let state = Arc::new(AppState { tx });
         let req = ChatCompletionRequest {
             model: "gpt-3.5-turbo".into(),
             messages: vec![
@@ -299,12 +336,23 @@ mod tests {
             max_tokens: None,
             stream: None,
         };
-        let resp = chat_completions(Json(req)).await.into_response();
+        let resp = chat_completions(State(state), Json(req))
+            .await
+            .into_response();
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
     #[tokio::test]
     async fn test_chat_completions_response_body() {
+        let (tx, mut rx) = mpsc::channel::<ProcessRequest>(1024);
+        tokio::spawn(async move {
+            while let Some(req) = rx.recv().await {
+                let _ = req.responder.send(Ok(ProcessResponse {
+                    result: req.data.clone(),
+                }));
+            }
+        });
+        let state = Arc::new(AppState { tx });
         let req = ChatCompletionRequest {
             model: "gpt-4".into(),
             messages: vec![ChatMessage {
@@ -315,7 +363,7 @@ mod tests {
             max_tokens: None,
             stream: None,
         };
-        let resp = chat_completions(Json(req)).await;
+        let resp = chat_completions(State(state), Json(req)).await;
         let (parts, body) = resp.into_response().into_parts();
         assert_eq!(parts.status, StatusCode::OK);
         let body: ChatCompletionResponse =

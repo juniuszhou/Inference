@@ -12,13 +12,28 @@ use candle_core::{Device, Tensor};
 use candle_transformers::generation::LogitsProcessor;
 use candle_transformers::models::quantized_llama::ModelWeights;
 pub use gguf::*;
+use serde::Serialize;
 use tokenizers::tokenizer::Tokenizer;
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
+
+#[derive(Debug)]
+pub struct ProcessRequest {
+    pub data: String,
+    pub responder: oneshot::Sender<Result<ProcessResponse, String>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProcessResponse {
+    pub result: String,
+}
 
 pub struct InferenceEngine {
     pub model: ModelWeights,
     pub device: Device,
     pub tokenizer: Tokenizer,
     pub logits_processor: LogitsProcessor,
+    pub rx: mpsc::Receiver<ProcessRequest>,
 }
 
 const CHAT_TEMPLATE: &str = "\
@@ -27,7 +42,12 @@ const CHAT_TEMPLATE: &str = "\
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";
 
 impl InferenceEngine {
-    pub fn new(seed: u64, temperature: Option<f64>, top_p: Option<f64>) -> Self {
+    pub fn new(
+        seed: u64,
+        temperature: Option<f64>,
+        top_p: Option<f64>,
+        rx: mpsc::Receiver<ProcessRequest>,
+    ) -> Self {
         let (weights, device) = get_model().expect("failed to get model");
 
         let model_path = std::path::Path::new(MODEL_PATH);
@@ -42,12 +62,31 @@ impl InferenceEngine {
             device,
             tokenizer,
             logits_processor: LogitsProcessor::new(seed, temperature, top_p),
+            rx,
         }
     }
 
+    pub async fn start(&mut self) {
+        loop {
+            tokio::select! {
+                req = self.rx.recv() => {
+                    if let Some(req) = req {
+                        let result = self.serve(&req.data, 100);
+                        match result {
+                            Ok(result) => {
+                                let _ = req.responder.send(Ok(ProcessResponse { result }));
+                            }
+                            Err(e) => {
+                                let _ = req.responder.send(Err(e.to_string()));
+                            }
+                        }
+                    }
+                }
+                _ = tokio::time::sleep(std::time::Duration::from_millis(1)) => {}
+            }
+        }
+    }
     pub fn serve(&mut self, prompt: &str, max_tokens: usize) -> Result<String> {
-        // let mut engine = self.shared.new_session(299792458, Some(0.7), Some(0.9));
-
         let formatted = CHAT_TEMPLATE.replace("{prompt}", prompt);
         let mut tokens = self
             .tokenizer
@@ -106,7 +145,8 @@ mod tests {
     use super::*;
 
     fn new_engine() -> InferenceEngine {
-        InferenceEngine::new(299792458, Some(0.7), Some(0.9))
+        let (_tx, rx) = mpsc::channel::<ProcessRequest>(1024);
+        InferenceEngine::new(299792458, Some(0.7), Some(0.9), rx)
     }
 
     #[test]

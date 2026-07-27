@@ -2534,7 +2534,9 @@ dependencies = [
  "candle-usage",
  "hf-hub 0.5.0",
  "parquet",
+ "serde",
  "tokenizers 0.22.2",
+ "tokio",
 ]
 
 [[package]]
