@@ -1017,6 +1017,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cudarust"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cudarc 0.19.8",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1775,6 +1783,14 @@ name = "glob"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
+
+[[package]]
+name = "gpgpu"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cudarc 0.19.8",
+]
 
 [[package]]
 name = "h2"
@@ -2689,6 +2705,10 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
+
+[[package]]
+name = "oneapi"
+version = "0.1.0"
 
 [[package]]
 name = "onig"

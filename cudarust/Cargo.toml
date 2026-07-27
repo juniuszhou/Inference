@@ -1,0 +1,9 @@
+[package]
+name = "cudarust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cudarc = { version = "0.19.3", features = ["cuda-12090", "cublas", "f16"] }
+
+anyhow = "1.0.99"

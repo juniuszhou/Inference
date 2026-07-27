@@ -1,5 +1,14 @@
 [workspace]
-members = ["candle-usage", "server", "models", "kernels", "locals"]
+members = [
+    "candle-usage",
+    "server",
+    "models",
+    "kernels",
+    "locals",
+    "oneapi",
+    "cudarust",
+    "gpgpu",
+]
 resolver = "2"
 
 [workspace.dependencies]
