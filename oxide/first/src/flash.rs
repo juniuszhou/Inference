@@ -8,6 +8,7 @@ pub mod flash {
 
     /// FlashAttention forward pass (1 thread per query row, Bc threads per block).
     /// Port of flash-attention-minimal's `forward_kernel`.
+    /// Bc must equal Br for this kernel's single-block-per-tile design.
     #[kernel]
     #[allow(non_snake_case)]
     pub fn flash_attention(
@@ -28,11 +29,15 @@ pub mod flash {
         let tx = thread::threadIdx_x() as i32;
         let bx = thread::blockIdx_x() as i32; // batch index
         let by = thread::blockIdx_y() as i32; // head index
+
+        // number of heads, it is not index
         let nh = thread::gridDim_y() as i32;
 
         // Offsets into Q,K,V,O and l,m for this (batch, head)
         let qkv_offset = (bx * nh * N * d) + (by * N * d);
+
         let lm_offset = (bx * nh * N) + (by * N);
+
         let tile_size = Bc * d; // size of Qi, Kj, Vj
 
         // l, m, O are written at raw indices computed from the launch

@@ -16,7 +16,7 @@ void forward_kernel(const float* Q, const float* K, const float* V, const int N,
     // Define SRAM for Q,K,V,S
     extern __shared__ float sram[];
     int tile_size = Bc * d;  // size of Qi, Kj, Vj
-    
+
     float* Qi = sram;
     float* Kj = &sram[tile_size];
     float* Vj = &sram[tile_size * 2];
@@ -91,13 +91,16 @@ torch::Tensor forward(torch::Tensor Q, torch::Tensor K, torch::Tensor V) {
     const int B = Q.size(0); const int nh = Q.size(1);
     const int N = Q.size(2); const int d = Q.size(3);
 
+    // split the sequence into Tc tiles of size Bc and Tr tiles of size Br
     const int Tc = ceil((float) N / Bc); const int Tr = ceil((float) N / Br);
+
     const float softmax_scale = 1.0 / sqrt(d);
 
     // Initialize O, l, m to HBM
     auto O = torch::zeros_like(Q);
     auto l = torch::zeros({B, nh, N});
     auto m = torch::full({B, nh, N}, -INFINITY);
+
     torch::Device device(torch::kCUDA);
     l = l.to(device); m = m.to(device);
 
@@ -109,7 +112,7 @@ torch::Tensor forward(torch::Tensor Q, torch::Tensor K, torch::Tensor V) {
     printf("Max shared memory: %d, requested shared memory: %d \\n", max_sram_size, sram_size);
 
     dim3 grid_dim(B, nh);  // batch_size x num_heads
-    dim3 block_dim(Bc);  // Bc threads per block
+    dim3 block_dim(Bc);  // Bc threads per block, executed in the same SM
 
     forward_kernel<<<grid_dim, block_dim, sram_size>>>(
         Q.data_ptr<float>(), K.data_ptr<float>(), V.data_ptr<float>(),
