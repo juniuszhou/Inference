@@ -4,3 +4,7 @@ extern "C" __global__ void vecadd(const float* a, const float* b, float* c, int 
         c[idx] = a[idx] + b[idx];
     }
 }
+
+extern "C" int add(int a, int b) {
+    return a + b;
+}

@@ -10,7 +10,7 @@ use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
 mod chat_web;
 use axum::extract::State;
-use models::{InferenceEngine, ProcessRequest};
+use engine::{InferenceEngine, ProcessRequest};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -199,7 +199,7 @@ fn rand_id() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use models::ProcessResponse;
+    use engine::ProcessResponse;
 
     #[test]
     fn test_request_payload_creation() {

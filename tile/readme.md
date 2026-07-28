@@ -1,0 +1,1 @@
+CUDA_TOOLKIT_PATH="/usr/local/cuda-13.3" PATH="/usr/local/cuda-13.3/bin":$PATH cargo run

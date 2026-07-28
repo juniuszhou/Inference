@@ -1,7 +1,16 @@
 use cuda_core::{CudaContext, DeviceBuffer, launch_kernel_on_stream};
 use std::ffi::c_void;
 
+unsafe extern "C" {
+    fn add(a: i32, b: i32) -> i32;
+}
+
 fn main() {
+    unsafe {
+        let result = add(3, 4);
+        println!("add(3, 4) = {}", result);
+    }
+
     let ctx = CudaContext::new(0).expect("Failed to create CUDA context");
     let stream = ctx.default_stream();
 
