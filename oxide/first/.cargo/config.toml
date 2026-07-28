@@ -1,0 +1,4 @@
+# Device debug metadata is not supported by the legacy LLVM 7 NVVM IR path,
+# so disable it for cuda-oxide device codegen (host debuginfo is unaffected).
+[env]
+CUDA_OXIDE_DEBUG = "off"

@@ -3,9 +3,15 @@ name = "first"
 version = "0.1.0"
 edition = "2024"
 
-[workspace]
+# The binary has no unit tests; building it in test mode breaks the
+# cuda-oxide device artifact embedding.
+[[bin]]
+name = "first"
+path = "src/main.rs"
+test = false
 
 [dependencies]
 cuda-device = { git = "https://github.com/NVlabs/cuda-oxide.git" }
 cuda-host = { git = "https://github.com/NVlabs/cuda-oxide.git" }
 cuda-core = { git = "https://github.com/NVlabs/cuda-oxide.git" }
+libm = "0.2"
