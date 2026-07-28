@@ -9,3 +9,8 @@ cargo oxide build
 ```bash
 cargo oxide run
 ```
+
+## test
+```bash
+cargo oxide test
+```

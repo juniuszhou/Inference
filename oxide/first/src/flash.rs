@@ -114,7 +114,11 @@ pub mod flash {
                 }
 
                 // Online softmax update
-                let row_m_new = if row_m_prev > row_m { row_m_prev } else { row_m };
+                let row_m_new = if row_m_prev > row_m {
+                    row_m_prev
+                } else {
+                    row_m
+                };
                 let row_l_new = libm::expf(row_m_prev - row_m_new) * row_l_prev
                     + libm::expf(row_m - row_m_new) * row_l;
 
