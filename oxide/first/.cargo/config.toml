@@ -2,3 +2,8 @@
 # so disable it for cuda-oxide device codegen (host debuginfo is unaffected).
 [env]
 CUDA_OXIDE_DEBUG = "off"
+# This crate is a member of the root Inference workspace, so rustc runs with
+# the workspace root as its cwd and generated device artifacts (first.ptx,
+# first.ll) would land there. Pin them to this project directory instead,
+# which is where `cargo oxide inspect` looks for them.
+CUDA_OXIDE_PTX_DIR = { value = ".", relative = true }
