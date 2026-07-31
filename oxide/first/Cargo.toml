@@ -14,4 +14,6 @@ test = false
 cuda-device = { git = "https://github.com/NVlabs/cuda-oxide.git" }
 cuda-host = { git = "https://github.com/NVlabs/cuda-oxide.git" }
 cuda-core = { git = "https://github.com/NVlabs/cuda-oxide.git" }
-libm = "0.2"
+# default-features = false disables libm's `arch` feature, whose x86 inline
+# asm (e.g. `sqrtss` in sqrtf) cannot be translated by the CUDA device codegen.
+libm = { version = "0.2", default-features = false }

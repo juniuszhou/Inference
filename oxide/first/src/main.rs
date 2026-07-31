@@ -2,6 +2,8 @@ use cuda_core::{CudaContext, DeviceBuffer, LaunchConfig};
 use cuda_device::{DisjointSlice, kernel, thread};
 use cuda_host::cuda_module;
 
+use first::flash;
+
 #[cuda_module]
 mod kernels {
     use super::*;
