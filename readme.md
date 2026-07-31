@@ -6,3 +6,11 @@ oxide
 
 https://github.com/rust-gpu/rust-cuda
 
+
+
+## tools from nvidia
+
+Nsight
+
+CompileIQ
+

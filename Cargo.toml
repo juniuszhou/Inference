@@ -10,7 +10,7 @@ members = [
     "gpgpu",
     "engine",
     "tile",
-    "oxide/first",
+    "oxide/first", "kv-manager",
 
 ]
 resolver = "2"
