@@ -4,14 +4,14 @@ pub use mlp::*;
 pub mod llama;
 pub use llama::*;
 
-pub mod gguf;
 use anyhow::Result;
 use candle_core::quantized::gguf_file;
 use candle_core::quantized::tokenizer::TokenizerFromGguf;
 use candle_core::{Device, Tensor};
 use candle_transformers::generation::LogitsProcessor;
 use candle_transformers::models::quantized_llama::ModelWeights;
-pub use gguf::*;
+// The gguf loader (MODEL_PATH, get_model, ...) moved to the models crate.
+pub use models::gguf::*;
 use serde::Serialize;
 use tokenizers::tokenizer::Tokenizer;
 use tokio::sync::mpsc;

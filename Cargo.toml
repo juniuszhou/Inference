@@ -3,25 +3,47 @@ members = [
     "candle-usage",
     "server",
     "models",
-    "kernels",
     "locals",
     "oneapi",
     "cudarust",
-    "gpgpu",
     "engine",
     "tile",
-    "oxide/first", "kv-manager",
-
+    "kv-manager",
 ]
+# Excluded crates resolve their dependencies standalone:
+# - rlx: rlx-cuda requires cudarc's `dynamic-loading` feature, candle requires
+#   `dynamic-linking`, and cudarc forbids enabling both in one build graph.
+# - oxide/first, kernels: depend on cuda-oxide crates that need its pinned
+#   nightly toolchain (cuda-macros uses `#![feature]`), so they cannot build
+#   with the stable toolchain the root workspace uses.
+# - gpgpu: not a workspace member; excluded to keep it buildable standalone.
+exclude = ["rlx", "gpgpu", "oxide/first", "kernels"]
 resolver = "2"
 
 [workspace.dependencies]
 axum = "0.7"
+# One shared cudarc definition for every workspace member. Cargo unifies
+# features across the graph, and candle-core (git) enables cudarc with
+# `dynamic-linking` + no default features; any member enabling the default
+# `dynamic-loading` feature makes cudarc's build script panic ("Both
+# `dynamic-loading` and `dynamic-linking` features are active").
+cudarc = { version = "0.19.8", default-features = false, features = [
+    "std",
+    "driver",
+    "cublas",
+    "cublaslt",
+    "curand",
+    "nvrtc",
+    "f16",
+    "cuda-version-from-build-system",
+    "dynamic-linking",
+] }
 tokenizers = { version = "0.22.0", features = ["http"] }
 tokio = { version = "1.48", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# candle
 candle-transformers = { version = "0.11.0", git = "https://github.com/huggingface/candle.git", features = [
     "cuda",
 ] }

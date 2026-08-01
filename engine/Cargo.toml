@@ -10,6 +10,7 @@ candle-transformers = { workspace = true, features = ["cuda"] }
 candle-core = { workspace = true, features = ["cuda"] }
 anyhow = "1.0"
 hf-hub = "0.5"
+models = { path = "../models" }
 tokio = { workspace = true }
 serde = { workspace = true }
 

@@ -1,0 +1,15 @@
+[package]
+name = "rlx"
+version = "0.1.0"
+edition = "2024"
+
+# Own workspace, detached from the root Inference workspace: rlx-cuda requires
+# cudarc's `dynamic-loading` feature, while candle (in the root workspace)
+# requires `dynamic-linking`. cudarc's build script forbids both features in
+# one build graph, so this crate must resolve its dependencies separately.
+[workspace]
+
+[dependencies]
+rlx-tensor = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git", features = [
+    "eval-cuda",
+] }

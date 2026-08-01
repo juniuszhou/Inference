@@ -1,3 +1,5 @@
+# cuda-core (cuda-oxide) requires this pinned nightly; the crate is excluded
+# from the root workspace, which builds on stable.
 [toolchain]
 channel = "nightly-2026-04-03"
 components = ["rust-src", "rustc-dev", "rust-analyzer", "clippy", "llvm-tools"]

@@ -1,0 +1,6 @@
+# Required by tile's `cun`/`cun-compiler` deps (cuda-bindings build script).
+# tile/.cargo/config.toml sets the same variable, but per-directory cargo
+# config only applies when cargo is invoked from inside tile/, so workspace
+# builds from the repo root need it here as well.
+[env]
+CUDA_TOOLKIT_PATH = "/usr/local/cuda-13.3"
