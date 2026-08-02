@@ -15,11 +15,20 @@ edition = "2024"
 [dependencies]
 rlx = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git", features = [
     "cuda",
+    "distributed",
 ] }
 
-rlx-cuda = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-cuda = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git", features = [
+    "nccl",
+] }
 
 # Used by tests/basic.rs.
 rlx-tensor = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git", features = [
     "eval-cuda",
 ] }
+
+# Used by tests/tokenizer.rs.
+rlx-text = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git" }
+
+# Used by tests/distributed.rs (SymmetricTransport / NVSHMEM stand-in).
+rlx-driver = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git" }
