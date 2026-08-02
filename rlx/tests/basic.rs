@@ -64,9 +64,9 @@ fn rlx_dsl_compiles_and_runs() {
 
 #[test]
 fn binary_add_matches_reference() {
-    // if !rlx_cuda::is_available() {
-    //     return;
-    // }
+    if !rlx_cuda::is_available() {
+        return;
+    }
     let mut g = Graph::new("add");
     let x = g.input("x", Shape::new(&[4], DType::F32));
     let y = g.input("y", Shape::new(&[4], DType::F32));
