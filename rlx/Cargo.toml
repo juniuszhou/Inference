@@ -1,5 +1,8 @@
 [package]
-name = "rlx"
+# Not "rlx": the package depends on the upstream `rlx` crate, and a package
+# cannot share its name with one of its dependencies (rustc would see two
+# rlibs named `rlx` and fail with E0464).
+name = "rlx-usage"
 version = "0.1.0"
 edition = "2024"
 
@@ -10,6 +13,13 @@ edition = "2024"
 [workspace]
 
 [dependencies]
+rlx = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git", features = [
+    "cuda",
+] }
+
+rlx-cuda = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git" }
+
+# Used by tests/basic.rs.
 rlx-tensor = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git", features = [
     "eval-cuda",
 ] }

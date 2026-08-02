@@ -1,0 +1,18 @@
+# The NVIDIA driver (595.84) supports CUDA <= 13.2, but /usr/local/cuda points
+# at CUDA 13.3, so cudarc's dlopen("libnvrtc.so") resolves to NVRTC 13.3, which
+# emits PTX ISA 9.3 that the driver rejects at cuModuleLoad time
+# (CUDA_ERROR_UNSUPPORTED_PTX_VERSION). Prepend the CUDA 13.2 libraries when
+# running binaries/tests so the JIT produces driver-compatible PTX.
+#
+# A cargo [env] entry doesn't work here: cargo rebuilds LD_LIBRARY_PATH for the
+# processes it runs, discarding the [env] value. The runner wrapper applies it
+# at exec time instead.
+#
+# If the stale-PTX error ever reappears, also clear ~/.cache/rlx-cuda/ —
+# rlx keys its PTX disk cache by source hash only, not by NVRTC version.
+[target.x86_64-unknown-linux-gnu]
+runner = [
+    "sh",
+    "-c",
+    "LD_LIBRARY_PATH=/usr/local/cuda-13.2/targets/x86_64-linux/lib:$LD_LIBRARY_PATH exec \"$0\" \"$@\"",
+]

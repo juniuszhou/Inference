@@ -720,8 +720,15 @@ dependencies = [
 
 [[package]]
 name = "rlx"
-version = "0.1.0"
+version = "0.2.14"
+source = "git+https://github.com/MIT-RLX/rlx.git#904ddb16973faef905fef851397d36212f8cf5f1"
 dependencies = [
+ "anyhow",
+ "rlx-driver",
+ "rlx-ir",
+ "rlx-macros",
+ "rlx-opt",
+ "rlx-runtime",
  "rlx-tensor",
 ]
 
@@ -952,6 +959,7 @@ version = "0.2.14"
 source = "git+https://github.com/MIT-RLX/rlx.git#904ddb16973faef905fef851397d36212f8cf5f1"
 dependencies = [
  "rlx-ir",
+ "rlx-macros",
  "rlx-runtime",
 ]
 
@@ -961,6 +969,15 @@ version = "0.2.14"
 source = "git+https://github.com/MIT-RLX/rlx.git#904ddb16973faef905fef851397d36212f8cf5f1"
 dependencies = [
  "rlx-ir",
+]
+
+[[package]]
+name = "rlx-usage"
+version = "0.1.0"
+dependencies = [
+ "rlx",
+ "rlx-cuda",
+ "rlx-tensor",
 ]
 
 [[package]]

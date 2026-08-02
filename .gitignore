@@ -4,6 +4,7 @@ debug
 target
 data
 locals
+rlx/lib
 
 **/.venv/
 
