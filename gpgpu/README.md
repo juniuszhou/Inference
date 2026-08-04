@@ -6,13 +6,56 @@ This is a comprehensive workspace for GPU programming and CUDA development.
 
 - MVSHMEM Module: GPU memory sharing functionality similar to NVSHMEM API, implemented in Rust
 - Multiple CUDA examples demonstrating GPU programming concepts
-- Test suite with comprehensive unit tests
+- CUDA unit tests for all kernel sources
+- Makefile for building and testing
 
 ## Projects
 
-1. **mvshmem** - GPU Memory Sharing Module
+1. **mvshmem** - GPU Memory Sharing Module (Rust)
 2. **shmem** - CUDA Program (C++) demonstrating GPU memory sharing
 3. **main.rs** - Main binary using cudarc for GPU operations
+
+## Build Instructions
+
+### CUDA Programs
+
+```bash
+make _build    # Compile all CUDA examples
+make clean     # Remove build artifacts
+```
+
+### CUDA Unit Tests
+
+```bash
+make test      # Build and run all CUDA unit tests
+```
+
+### Flash Attention Benchmark
+
+```bash
+make run-flash # Run flash attention benchmark (requires PyTorch)
+```
+
+## Testing
+
+### CUDA Unit Tests
+
+Run all CUDA unit tests:
+```bash
+make test
+```
+
+Tests cover:
+- `tests/test_add.cu` — Tests `add` and `addSlice` kernels from `src/add.cu`
+- `tests/test_multiply.cu` — Tests `matmul` kernel from `src/multiply.cu`
+- `tests/test_shmem.cu` — Tests `cuda_put_kernel` from `src/shmem.cu`
+- `tests/test_nccl.cu` — Placeholder for `src/nccl_demo.cu`
+
+### Rust Tests (requires CUDA)
+
+```bash
+cargo test
+```
 
 ## Usage
 
@@ -34,17 +77,13 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-## Build Instructions
+## Makefile Targets
 
-```bash
-cargo build
-cargo run --bin gpgpu
-cargo test
-```
-
-## Testing
-
-Run the MVSHMEM tests:
-```bash
-cargo test --test mvshmem-test
-```
+| Target | Description |
+|--------|-------------|
+| `_build` | Compile all CUDA examples |
+| `test` | Build and run all CUDA unit tests |
+| `run` | Build and run standalone CUDA demos |
+| `clean` | Remove build artifacts |
+| `run-flash` | Run flash attention benchmark (requires PyTorch) |
+| `help` | Show this help |
