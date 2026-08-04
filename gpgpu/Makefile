@@ -9,16 +9,17 @@ TESTDIR   = tests
 SRCDIR    = src
 FLASHDIR  = flash-attention-minimal
 
-# Standalone executables
-EXES = $(BUILDDIR)/main $(BUILDDIR)/basic $(BUILDDIR)/shmem $(BUILDDIR)/nccl_demo
+# Standalone executable (entry point)
+EXES = $(BUILDDIR)/main
 
 # Test executables
 TESTS = $(TESTDIR)/test_add \
         $(TESTDIR)/test_multiply \
         $(TESTDIR)/test_shmem \
-        $(TESTDIR)/test_nccl
+        $(TESTDIR)/test_nccl \
+        $(TESTDIR)/test_basic
 
-.PHONY: all _build clean test run run-flash help
+.PHONY: all _build clean test test_add test_multiply test_shmem test_nccl test_basic run run-main run-flash help
 
 all: _build
 
@@ -31,38 +32,35 @@ $(BUILDDIR):
 $(TESTDIR):
 	mkdir -p $(TESTDIR)
 
-# Kernel objects for tests (NO_MAIN defined)
+# Kernel objects for tests
 $(BUILDDIR)/add_test.o: $(SRCDIR)/add.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) -DNO_MAIN -c $< -o $@
+	$(CUDA) $(CUDAFLAGS) -c $< -o $@
 
 $(BUILDDIR)/multiply_test.o: $(SRCDIR)/multiply.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) -DNO_MAIN -c $< -o $@
+	$(CUDA) $(CUDAFLAGS) -c $< -o $@
 
 $(BUILDDIR)/shmem_test.o: $(SRCDIR)/shmem.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) -DNO_MAIN -c $< -o $@
+	$(CUDA) $(CUDAFLAGS) -c $< -o $@
+
+$(BUILDDIR)/basic_test.o: $(SRCDIR)/basic.cu | $(BUILDDIR)
+	$(CUDA) $(CUDAFLAGS) -c $< -o $@
 
 $(BUILDDIR)/nccl_test.o: $(SRCDIR)/nccl_demo.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) -DNO_MAIN $(NCCLFLAGS) -c $< -o $@
+	$(CUDA) $(CUDAFLAGS) $(NCCLFLAGS) -c $< -o $@
 
-# Standalone executables
-$(BUILDDIR)/main: main.cu $(BUILDDIR)/basic_no_main.o | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/basic_no_main.o -o $@
+# Standalone executable
+$(BUILDDIR)/main: main.cu $(BUILDDIR)/basic.o | $(BUILDDIR)
+	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/basic.o -o $@
 
-$(BUILDDIR)/basic_no_main.o: $(SRCDIR)/basic.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) -DNO_MAIN -c $< -o $@
-
-$(BUILDDIR)/basic: $(SRCDIR)/basic.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) $< -o $@
-
-$(BUILDDIR)/shmem: $(SRCDIR)/shmem.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) $< -o $@
-
-$(BUILDDIR)/nccl_demo: $(SRCDIR)/nccl_demo.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) $< $(NCCLFLAGS) -o $@
+$(BUILDDIR)/basic.o: $(SRCDIR)/basic.cu | $(BUILDDIR)
+	$(CUDA) $(CUDAFLAGS) -c $< -o $@
 
 # Test executables
 $(TESTDIR)/test_add: $(TESTDIR)/test_add.cu $(BUILDDIR)/add_test.o | $(TESTDIR)
 	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/add_test.o -o $@
+
+$(TESTDIR)/test_basic: $(TESTDIR)/test_basic.cu $(BUILDDIR)/basic_test.o | $(TESTDIR)
+	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/basic_test.o -o $@
 
 $(TESTDIR)/test_multiply: $(TESTDIR)/test_multiply.cu $(BUILDDIR)/multiply_test.o | $(TESTDIR)
 	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/multiply_test.o -o $@
@@ -95,31 +93,35 @@ test: _build $(TESTS)
 	rm -f $(TESTS)
 	@echo "Cleaned test binaries."
 
-test_add: $(TESTDIR)/test_add
+# Individual tests (self-contained: build -> run -> clean)
+test_add: $(BUILDDIR)/add_test.o
+	$(CUDA) $(CUDAFLAGS) $(TESTDIR)/test_add.cu $(BUILDDIR)/add_test.o -o $(TESTDIR)/test_add
 	./$(TESTDIR)/test_add
 	rm -f $(TESTDIR)/test_add
 
-test_multiply: $(TESTDIR)/test_multiply
+test_basic: $(BUILDDIR)/basic_test.o
+	$(CUDA) $(CUDAFLAGS) $(TESTDIR)/test_basic.cu $(BUILDDIR)/basic_test.o -o $(TESTDIR)/test_basic
+	./$(TESTDIR)/test_basic
+	rm -f $(TESTDIR)/test_basic
+
+test_multiply: $(BUILDDIR)/multiply_test.o
+	$(CUDA) $(CUDAFLAGS) $(TESTDIR)/test_multiply.cu $(BUILDDIR)/multiply_test.o -o $(TESTDIR)/test_multiply
 	./$(TESTDIR)/test_multiply
 	rm -f $(TESTDIR)/test_multiply
 
-test_shmem: $(TESTDIR)/test_shmem
+test_shmem: $(BUILDDIR)/shmem_test.o
+	$(CUDA) $(CUDAFLAGS) $(TESTDIR)/test_shmem.cu $(BUILDDIR)/shmem_test.o -o $(TESTDIR)/test_shmem
 	./$(TESTDIR)/test_shmem
 	rm -f $(TESTDIR)/test_shmem
 
-test_nccl: $(TESTDIR)/test_nccl
+test_nccl: $(BUILDDIR)/nccl_test.o
+	$(CUDA) $(CUDAFLAGS) $(TESTDIR)/test_nccl.cu $(BUILDDIR)/nccl_test.o $(NCCLFLAGS) -o $(TESTDIR)/test_nccl
 	./$(TESTDIR)/test_nccl
 	rm -f $(TESTDIR)/test_nccl
 
 run: _build
 	@echo "=== Running main ==="
 	./$(BUILDDIR)/main
-	@echo "=== Running basic ==="
-	./$(BUILDDIR)/basic
-	@echo "=== Running shmem ==="
-	./$(BUILDDIR)/shmem
-	@echo "=== Running nccl_demo ==="
-	./$(BUILDDIR)/nccl_demo
 
 run-main: _build
 	./$(BUILDDIR)/main
@@ -135,6 +137,7 @@ help:
 	@echo "  test_add      - Run single test: add.cu kernels"
 	@echo "  test_multiply - Run single test: multiply.cu kernels"
 	@echo "  test_shmem    - Run single test: shmem.cu kernels"
+	@echo "  test_basic    - Run single test: basic.cu kernels"
 	@echo "  test_nccl     - Run single test: nccl_demo.cu (broadcast/reduce/allreduce)"
 	@echo "  run_main   - Build and run main.cu"
 	@echo "  clean         - Remove build artifacts"

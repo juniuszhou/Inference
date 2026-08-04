@@ -1,5 +1,4 @@
 #include "multiply.cuh"
-#include <stdio.h>
 
 extern "C" __global__ void matmul(const float* A, const float* B, float* C, int m, int k, int n) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -12,10 +11,3 @@ extern "C" __global__ void matmul(const float* A, const float* B, float* C, int 
         C[row * n + col] = sum;
     }
 }
-
-#ifndef NO_MAIN
-int main() {
-    printf("multiply.cu standalone: kernels in multiply.cu\n");
-    return 0;
-}
-#endif
