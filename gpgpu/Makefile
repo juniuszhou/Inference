@@ -87,6 +87,8 @@ test: _build $(TESTS)
 	@echo "========================================"
 	@echo "All CUDA unit tests PASSED"
 	@echo "========================================"
+	rm -f $(TESTS)
+	@echo "Cleaned test binaries."
 
 run: _build
 	@echo "=== Running main ==="
@@ -103,7 +105,7 @@ run-flash:
 help:
 	@echo "Available targets:"
 	@echo "  _build     - Compile all CUDA examples"
-	@echo "  test       - Build and run all CUDA unit tests"
+	@echo "  test       - Build and run all CUDA unit tests (clean binaries after)"
 	@echo "  run        - Build and run standalone CUDA demos"
 	@echo "  clean      - Remove build artifacts"
 	@echo "  run-flash  - Run flash attention benchmark (requires PyTorch)"
