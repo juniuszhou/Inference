@@ -4,7 +4,9 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "../src/add.cuh"
+// Forward declarations (implementation in src/add.cu)
+extern "C" __global__ void add(float* a, float* b, float* c, int N);
+extern "C" __global__ void addSlice(float* a, float* b, float* c, int a_off, int b_off, int c_off, int N);
 
 #define BLOCK_SIZE 256
 #define EPSILON 1e-5

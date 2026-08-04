@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../src/shmem.cuh"
+// Forward declaration (implementation in src/shmem.cu)
+__global__ void cuda_put_kernel(int* my_buffer, int* neighbor_buffer);
 
 int main() {
     printf("Testing shmem.cu cuda_put_kernel...\n");

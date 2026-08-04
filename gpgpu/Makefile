@@ -2,22 +2,17 @@
 
 CUDA      ?= nvcc
 CUDAFLAGS ?= -arch=sm_86 -O2
-CXX       ?= g++
-CXXFLAGS  ?= -std=c++17
 
 BUILDDIR  = build
 TESTDIR   = tests
 SRCDIR    = src
 FLASHDIR  = flash-attention-minimal
 
-# Standalone executables (have main)
+# Kernel object files (compiled without main for test linking)
+TEST_OBJS = $(BUILDDIR)/add_test.o $(BUILDDIR)/multiply_test.o $(BUILDDIR)/shmem_test.o
+
+# Standalone executables (compiled with main)
 EXES = $(BUILDDIR)/main $(BUILDDIR)/basic $(BUILDDIR)/shmem
-
-# Kernel-only .cu files (no main) - built as .o for potential reuse
-KERN_OBJS = $(BUILDDIR)/add.o $(BUILDDIR)/multiply.o
-
-# Build targets with no main (compiled but not linked)
-NO_MAIN_EXES = $(BUILDDIR)/nccl_demo
 
 # Test executables
 TESTS = $(TESTDIR)/test_add \
@@ -29,12 +24,26 @@ TESTS = $(TESTDIR)/test_add \
 
 all: _build
 
-_build: $(EXES) $(KERN_OBJS) $(NO_MAIN_EXES)
+_build: $(EXES)
 	@echo "Build complete."
 
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
+$(TESTDIR):
+	mkdir -p $(TESTDIR)
+
+# Kernel objects for tests (NO_MAIN defined to skip main())
+$(BUILDDIR)/add_test.o: $(SRCDIR)/add.cu | $(BUILDDIR)
+	$(CUDA) $(CUDAFLAGS) -DNO_MAIN -c $< -o $@
+
+$(BUILDDIR)/multiply_test.o: $(SRCDIR)/multiply.cu | $(BUILDDIR)
+	$(CUDA) $(CUDAFLAGS) -DNO_MAIN -c $< -o $@
+
+$(BUILDDIR)/shmem_test.o: $(SRCDIR)/shmem.cu | $(BUILDDIR)
+	$(CUDA) $(CUDAFLAGS) -DNO_MAIN -c $< -o $@
+
+# Standalone executables
 $(BUILDDIR)/main: main.cu | $(BUILDDIR)
 	$(CUDA) $(CUDAFLAGS) $< -o $@
 
@@ -44,33 +53,22 @@ $(BUILDDIR)/basic: $(SRCDIR)/basic.cu | $(BUILDDIR)
 $(BUILDDIR)/shmem: $(SRCDIR)/shmem.cu | $(BUILDDIR)
 	$(CUDA) $(CUDAFLAGS) $< -o $@
 
-$(BUILDDIR)/nccl_demo: $(SRCDIR)/nccl_demo.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) -c $< -o $@
+# Test executables
+$(TESTDIR)/test_add: $(TESTDIR)/test_add.cu $(BUILDDIR)/add_test.o | $(TESTDIR)
+	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/add_test.o -o $@
 
-$(BUILDDIR)/add.o: $(SRCDIR)/add.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) -c $< -o $@
+$(TESTDIR)/test_multiply: $(TESTDIR)/test_multiply.cu $(BUILDDIR)/multiply_test.o | $(TESTDIR)
+	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/multiply_test.o -o $@
 
-$(BUILDDIR)/multiply.o: $(SRCDIR)/multiply.cu | $(BUILDDIR)
-	$(CUDA) $(CUDAFLAGS) -c $< -o $@
-
-$(TESTDIR):
-	mkdir -p $(TESTDIR)
-
-$(TESTDIR)/test_add: $(TESTDIR)/test_add.cu | $(TESTDIR)
-	$(CUDA) $(CUDAFLAGS) $< -o $@
-
-$(TESTDIR)/test_multiply: $(TESTDIR)/test_multiply.cu | $(TESTDIR)
-	$(CUDA) $(CUDAFLAGS) $< -o $@
-
-$(TESTDIR)/test_shmem: $(TESTDIR)/test_shmem.cu | $(TESTDIR)
-	$(CUDA) $(CUDAFLAGS) $< -o $@
+$(TESTDIR)/test_shmem: $(TESTDIR)/test_shmem.cu $(BUILDDIR)/shmem_test.o | $(TESTDIR)
+	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/shmem_test.o -o $@
 
 $(TESTDIR)/test_nccl: $(TESTDIR)/test_nccl.cu | $(TESTDIR)
 	$(CUDA) $(CUDAFLAGS) $< -o $@
 
 clean:
 	rm -rf $(BUILDDIR)
-	rm -f $(TESTDIR)/test_add $(TESTDIR)/test_multiply $(TESTDIR)/test_shmem $(TESTDIR)/test_nccl
+	rm -f $(TESTS)
 	@echo "Cleaned build artifacts."
 
 test: _build $(TESTS)
@@ -90,6 +88,39 @@ test: _build $(TESTS)
 	rm -f $(TESTS)
 	@echo "Cleaned test binaries."
 
+# Run a single test: make test_add, make test_multiply, etc.
+test_add: $(TESTDIR)/test_add
+	@echo ">>> Running $(TESTDIR)/test_add"
+	@echo "----------------------------------------"
+	./$(TESTDIR)/test_add
+	rm -f $(TESTDIR)/test_add
+	@echo ">>> $(TESTDIR)/test_add PASSED"
+	@echo "Cleaned test binary."
+
+test_multiply: $(TESTDIR)/test_multiply
+	@echo ">>> Running $(TESTDIR)/test_multiply"
+	@echo "----------------------------------------"
+	./$(TESTDIR)/test_multiply
+	rm -f $(TESTDIR)/test_multiply
+	@echo ">>> $(TESTDIR)/test_multiply PASSED"
+	@echo "Cleaned test binary."
+
+test_shmem: $(TESTDIR)/test_shmem
+	@echo ">>> Running $(TESTDIR)/test_shmem"
+	@echo "----------------------------------------"
+	./$(TESTDIR)/test_shmem
+	rm -f $(TESTDIR)/test_shmem
+	@echo ">>> $(TESTDIR)/test_shmem PASSED"
+	@echo "Cleaned test binary."
+
+test_nccl: $(TESTDIR)/test_nccl
+	@echo ">>> Running $(TESTDIR)/test_nccl"
+	@echo "----------------------------------------"
+	./$(TESTDIR)/test_nccl
+	rm -f $(TESTDIR)/test_nccl
+	@echo ">>> $(TESTDIR)/test_nccl PASSED"
+	@echo "Cleaned test binary."
+
 run: _build
 	@echo "=== Running main ==="
 	./$(BUILDDIR)/main
@@ -106,11 +137,11 @@ help:
 	@echo "Available targets:"
 	@echo "  _build     - Compile all CUDA examples"
 	@echo "  test       - Build and run all CUDA unit tests (clean binaries after)"
-	@echo "  run        - Build and run standalone CUDA demos"
+	@echo "  test_add   - Run single test: add.cu kernels"
+	@echo "  test_multiply - Run single test: multiply.cu kernels"
+	@echo "  test_shmem  - Run single test: shmem.cu kernels"
+	@echo "  test_nccl   - Run single test: nccl_demo.cu"
+	@echo "  run        - Build and run standalone demos"
 	@echo "  clean      - Remove build artifacts"
-	@echo "  run-flash  - Run flash attention benchmark (requires PyTorch)"
+	@echo "  run-flash  - Run flash attention benchmark (needs PyTorch)"
 	@echo "  help       - Show this help"
-	@echo ""
-	@echo "Options:"
-	@echo "  CUDA=nvcc       - Set CUDA compiler (default: nvcc)"
-	@echo "  CUDAFLAGS=-arch=sm_86 - Set CUDA architecture flags"

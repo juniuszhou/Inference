@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "../src/multiply.cuh"
+// Forward declaration (implementation in src/multiply.cu)
+extern "C" __global__ void matmul(const float* A, const float* B, float* C, int m, int k, int n);
 
 #define BLOCK_SIZE 16
 #define EPSILON 1e-3
