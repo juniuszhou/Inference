@@ -1,13 +1,7 @@
 #include "main.cuh"
 #include <stdio.h>
 
-__global__ void add1D(float* a, float* b, float* c, int N) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < N) {
-        c[idx] = a[idx] + b[idx];
-    }
-}
-
+#ifndef NO_MAIN
 int main() {
     int N = 1 << 20;
     size_t size = N * sizeof(float);
@@ -34,7 +28,7 @@ int main() {
     dim3 block(256);
     dim3 grid((N + block.x - 1) / block.x);
 
-    add1D<<<grid, block>>>(d_a, d_b, d_c, N);
+    add_global<<<grid, block>>>(d_a, d_b, d_c, N);
 
     cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError();
@@ -55,3 +49,4 @@ int main() {
     printf("Done! Grid = %d, Block = %d\n", grid.x, block.x);
     return 0;
 }
+#endif
