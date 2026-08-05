@@ -30,7 +30,9 @@ int main() {
 
     add_global<<<grid, block>>>(d_a, d_b, d_c, N);
 
+    // Wait for the kernel to finish, call it in CPU
     cudaDeviceSynchronize();
+
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("CUDA Error: %s\n", cudaGetErrorString(err));

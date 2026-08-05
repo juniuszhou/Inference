@@ -17,7 +17,7 @@ members = [
 #   nightly toolchain (cuda-macros uses `#![feature]`), so they cannot build
 #   with the stable toolchain the root workspace uses.
 # - gpgpu: not a workspace member; excluded to keep it buildable standalone.
-exclude = ["rlx", "gpgpu", "oxide/first", "kernels"]
+exclude = ["rlx-demo", "gpgpu", "oxide/first", "kernels"]
 resolver = "2"
 
 [workspace.dependencies]

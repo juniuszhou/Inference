@@ -8,7 +8,7 @@ use candle_nn::{
 use candle_transformers::generation::{LogitsProcessor, Sampling};
 use candle_transformers::models::llama::Cache;
 use candle_usage::get_reader;
-use models::llama::{LlamaExt, load_llama};
+use engine::llama::{LlamaExt, load_llama};
 use tokenizers::Tokenizer;
 
 const EOS_TOKEN: &str = "</s>";

@@ -3,6 +3,7 @@
 CUDA      ?= nvcc
 CUDAFLAGS ?= -arch=sm_86 -O2
 NCCLFLAGS ?= -I/usr/include -L/usr/lib/x86_64-linux-gnu -lnccl
+CUBLASFLAGS ?= -lcublas
 
 BUILDDIR  = build
 TESTDIR   = tests
@@ -17,9 +18,10 @@ TESTS = $(TESTDIR)/test_add \
         $(TESTDIR)/test_multiply \
         $(TESTDIR)/test_shmem \
         $(TESTDIR)/test_nccl \
-        $(TESTDIR)/test_basic
+        $(TESTDIR)/test_basic \
+        $(TESTDIR)/test_blas
 
-.PHONY: all _build clean test test_add test_multiply test_shmem test_nccl test_basic run run-main run-flash help
+.PHONY: all _build clean test test_add test_multiply test_shmem test_nccl test_basic test_blas run run-main run-flash help
 
 all: _build
 
@@ -55,6 +57,7 @@ $(BUILDDIR)/main: main.cu $(BUILDDIR)/basic.o | $(BUILDDIR)
 $(BUILDDIR)/basic.o: $(SRCDIR)/basic.cu | $(BUILDDIR)
 	$(CUDA) $(CUDAFLAGS) -c $< -o $@
 
+
 # Test executables
 $(TESTDIR)/test_add: $(TESTDIR)/test_add.cu $(BUILDDIR)/add_test.o | $(TESTDIR)
 	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/add_test.o -o $@
@@ -70,6 +73,9 @@ $(TESTDIR)/test_shmem: $(TESTDIR)/test_shmem.cu $(BUILDDIR)/shmem_test.o | $(TES
 
 $(TESTDIR)/test_nccl: $(TESTDIR)/test_nccl.cu $(BUILDDIR)/nccl_test.o | $(TESTDIR)
 	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/nccl_test.o $(NCCLFLAGS) -o $@
+
+$(TESTDIR)/test_blas: $(TESTDIR)/test_blas.cu | $(TESTDIR)
+	$(CUDA) $(CUDAFLAGS) $< $(CUBLASFLAGS) -o $@
 
 clean:
 	rm -rf $(BUILDDIR)
@@ -119,6 +125,11 @@ test_nccl: $(BUILDDIR)/nccl_test.o
 	./$(TESTDIR)/test_nccl
 	rm -f $(TESTDIR)/test_nccl
 
+test_blas:
+	$(CUDA) $(CUDAFLAGS) $(TESTDIR)/test_blas.cu $(CUBLASFLAGS) -o $(TESTDIR)/test_blas
+	./$(TESTDIR)/test_blas
+	rm -f $(TESTDIR)/test_blas
+
 run: _build
 	@echo "=== Running main ==="
 	./$(BUILDDIR)/main
@@ -139,6 +150,7 @@ help:
 	@echo "  test_shmem    - Run single test: shmem.cu kernels"
 	@echo "  test_basic    - Run single test: basic.cu kernels"
 	@echo "  test_nccl     - Run single test: nccl_demo.cu (broadcast/reduce/allreduce)"
+	@echo "  test_blas     - Run single test: cuBLAS SGEMM"
 	@echo "  run_main   - Build and run main.cu"
 	@echo "  clean         - Remove build artifacts"
 	@echo "  run-flash     - Run flash attention benchmark (needs PyTorch)"

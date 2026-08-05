@@ -15,3 +15,8 @@ make clean     # Remove build artifacts
 make test      # Build and run all CUDA unit tests
 make test_add # run a single test
 ```
+
+
+
+## cuda header file path
+/usr/local/cuda/include/cublas_api.h

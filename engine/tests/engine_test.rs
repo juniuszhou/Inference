@@ -1,4 +1,4 @@
-use models::{InferenceEngine, ProcessRequest};
+use engine::{InferenceEngine, ProcessRequest};
 use tokio::sync::mpsc;
 
 #[test]

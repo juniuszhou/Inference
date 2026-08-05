@@ -29,17 +29,27 @@ pub struct ProcessResponse {
 }
 
 pub struct InferenceEngine {
-    pub model: ModelWeights,
+    // pub model: ModelWeights,
     pub device: Device,
     pub tokenizer: Tokenizer,
     pub logits_processor: LogitsProcessor,
     pub rx: mpsc::Receiver<ProcessRequest>,
+    pub inner: EngineInnerType,
 }
 
 const CHAT_TEMPLATE: &str = "\
 <|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n\
 {prompt}\
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";
+
+pub trait InferenceEngineTrait {
+    fn serve(&mut self, prompt: &str, max_tokens: usize) -> Result<String>;
+}
+
+pub enum EngineInnerType {
+    Candle(ModelWeights),
+    OpenInference,
+}
 
 impl InferenceEngine {
     pub fn new(
@@ -56,9 +66,10 @@ impl InferenceEngine {
         let tokenizer = TokenizerFromGguf::from_gguf(&content)
             .map_err(|e| anyhow::Error::msg(e.to_string()))
             .expect("failed to create tokenizer");
+        let inner = EngineInnerType::Candle(weights);
 
         Self {
-            model: weights,
+            inner,
             device,
             tokenizer,
             logits_processor: LogitsProcessor::new(seed, temperature, top_p),
@@ -101,8 +112,16 @@ impl InferenceEngine {
             .map_err(anyhow::Error::msg)?
             .unsqueeze(0)?;
 
-        let logits = self.model.forward(&input, 0).map_err(anyhow::Error::msg)?;
-        let logits = logits.squeeze(0).map_err(anyhow::Error::msg)?;
+        let logits = match &mut self.inner {
+            EngineInnerType::Candle(model) => {
+                let logits = model.forward(&input, 0).map_err(anyhow::Error::msg)?;
+                logits.squeeze(0).map_err(anyhow::Error::msg)?
+            }
+            EngineInnerType::OpenInference => {
+                unimplemented!()
+            }
+        };
+
         let mut next_token = self
             .logits_processor
             .sample(&logits)
@@ -115,10 +134,15 @@ impl InferenceEngine {
             let input = Tensor::new(&[next_token], &self.device)
                 .map_err(anyhow::Error::msg)?
                 .unsqueeze(0)?;
-            let logits = self
-                .model
-                .forward(&input, prompt_len + i - 1)
-                .map_err(anyhow::Error::msg)?;
+            let logits = match &mut self.inner {
+                EngineInnerType::Candle(model) => model
+                    .forward(&input, prompt_len + i - 1)
+                    .map_err(anyhow::Error::msg)?,
+                EngineInnerType::OpenInference => {
+                    unimplemented!()
+                }
+            };
+
             let logits = logits.squeeze(0).map_err(anyhow::Error::msg)?;
 
             next_token = self
