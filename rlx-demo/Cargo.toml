@@ -13,22 +13,72 @@ edition = "2024"
 [workspace]
 
 [dependencies]
-rlx = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git", features = [
+rlx = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx.git", features = [
     "cuda",
     "distributed",
 ] }
 
-rlx-cuda = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git", features = [
+rlx-cuda = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx.git", features = [
     "nccl",
 ] }
 
 # Used by tests/basic.rs.
-rlx-tensor = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git", features = [
+rlx-tensor = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx.git", features = [
     "eval-cuda",
 ] }
 
 # Used by tests/tokenizer.rs.
-rlx-text = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-text = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx.git" }
 
 # Used by tests/distributed.rs (SymmetricTransport / NVSHMEM stand-in).
-rlx-driver = { version = "0.2.13", git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-driver = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx.git" }
+
+# Used by tests/node.rs (host-side optimizers: Sgd / Adam / AdamW).
+rlx-optim = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx.git" }
+
+
+rlx-flow = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx.git" }
+
+rlx-llama32 = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx-models.git", features = [
+    "cuda",
+] }
+
+# Used by tests/llama.rs.
+rlx-runtime = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-core = { version = "0.2.14", package = "rlx-models-core", git = "https://github.com/MIT-RLX/rlx-models.git" }
+rlx-qwen3 = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx-models.git" }
+rlx-qwen35 = { version = "0.2.14", git = "https://github.com/MIT-RLX/rlx-models.git" }
+anyhow = "1"
+
+[patch.crates-io]
+# rlx-models pins rlx-* at ^0.2.14 on crates.io, but 0.2.14 is not published
+# yet for most of those crates. Redirect registry deps to the rlx git repo
+# (same source this package already uses for direct deps). Patch the full set
+# together so path/registry builds do not mix.
+rlx = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-ir = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-flow = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-runtime = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-compile = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-opt = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-optim = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-autodiff = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-fusion = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-driver = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-distributed = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-cpu = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-gguf = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-pkg = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-nemo = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-text = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-onnx-import = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-metal = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-mlx = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-mlx-sys = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-mlx-io = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-cuda = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-wgpu = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-vulkan = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-gpu-host = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-rocm = { git = "https://github.com/MIT-RLX/rlx.git" }
+rlx-tensor = { git = "https://github.com/MIT-RLX/rlx.git" }

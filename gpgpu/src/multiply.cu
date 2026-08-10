@@ -10,10 +10,10 @@ extern "C" __global__ void matmul(const float* A, const float* B, float* C, int 
         }
 
         // Synchronize threads in the block
-        __syncthreads();
+        // __syncthreads();
 
         // Synchronize threads in the warp
-        __syncwarp();
+        // __syncwarp();
 
         // after warp synchronization, we can use __shfl_sync to shuffle data between threads
         // __shfl_sync

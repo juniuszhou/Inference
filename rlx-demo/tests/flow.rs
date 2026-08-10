@@ -5,7 +5,7 @@
 
 use rlx::prelude::*;
 use rlx_cuda::backend::CudaExecutable;
-use rlx_flow::{FlowStage, MapWeights, ModelFlow, blocks::RmsNormStage};
+use rlx_flow::{blocks::RmsNormStage, FlowStage, MapWeights, ModelFlow};
 
 #[test]
 fn test_flow() {

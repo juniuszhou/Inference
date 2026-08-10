@@ -35,7 +35,7 @@ fn test_train() {
     let diff = g.sub(pred, y);
     let sq = g.mul(diff, diff);
     let loss = g.mean(sq, vec![0, 1], false); // scalar
-    // here the output just loss
+                                              // here the output just loss
     g.set_outputs(vec![loss]);
 
     // ── Backward: outputs [loss, dW, dB]; the forward params become run() inputs.
@@ -130,9 +130,8 @@ fn test_train_multiple_modules() {
     let bwd = grad_with_loss(&g, &wrt);
     let mut compiled = Session::new(Device::Cuda).compile(bwd);
 
-    // ── Two optimizers, one per layer: a smaller LR on the first layer ─────
-    let mut opt_layer1 = rlx_optim::Adam::new(0.05);
-    let mut opt_layer2 = rlx_optim::Adam::new(0.1);
+    // ── One optimizer for ALL params (state is keyed by name internally) ───
+    let mut opt = rlx_optim::Adam::new(0.1);
     let mut w1_v = vec![0.5_f32, -0.5, 0.3, 0.2, -0.1, 0.4, 0.2, 0.3]; // [2,4]
     let mut b1_v = vec![0.0_f32; H];
     let mut w2_v = vec![0.5_f32, -0.4, 0.3, 0.2]; // [4,1]
@@ -145,17 +144,41 @@ fn test_train_multiple_modules() {
         compiled.set_param("b1", &b1_v);
         compiled.set_param("w2", &w2_v);
         compiled.set_param("b2", &b2_v);
+        // get the output and gradient in single run
+        // 0 is loss, 1 is gradient of w1, 2 is gradient of b1, 3 is gradient of w2, 4 is gradient of b2
+
         let out = compiled.run(&[("x", &xs[..]), ("y", &ys[..]), ("d_output", &[1.0_f32])]);
         let loss_v = out[0][0];
 
-        // Layer 1 update: W1 [2,H], b1 [H].
-        opt_layer1.step("w1", &[2, H], &mut w1_v, &out[1]);
-        opt_layer1.step("b1", &[H], &mut b1_v, &out[2]);
-        // Layer 2 update: W2 [H,1], b2 [1].
-        opt_layer2.step("w2", &[H, 1], &mut w2_v, &out[3]);
-        opt_layer2.step("b2", &[1], &mut b2_v, &out[4]);
-        opt_layer1.end_iteration();
-        opt_layer2.end_iteration();
+        // One batched step over every parameter (name is the optimizer key).
+        let mut items = [
+            rlx_optim::OptItem {
+                name: "w1",
+                shape: &[2, H],
+                param: &mut w1_v,
+                grad: &out[1],
+            },
+            rlx_optim::OptItem {
+                name: "b1",
+                shape: &[H],
+                param: &mut b1_v,
+                grad: &out[2],
+            },
+            rlx_optim::OptItem {
+                name: "w2",
+                shape: &[H, 1],
+                param: &mut w2_v,
+                grad: &out[3],
+            },
+            rlx_optim::OptItem {
+                name: "b2",
+                shape: &[1],
+                param: &mut b2_v,
+                grad: &out[4],
+            },
+        ];
+        opt.step_batch(&mut items);
+        opt.end_iteration();
 
         if step % 500 == 0 || loss_v < target_loss {
             println!(

@@ -19,9 +19,10 @@ TESTS = $(TESTDIR)/test_add \
         $(TESTDIR)/test_shmem \
         $(TESTDIR)/test_nccl \
         $(TESTDIR)/test_basic \
-        $(TESTDIR)/test_blas
+        $(TESTDIR)/test_blas \
+        $(TESTDIR)/test_reduce
 
-.PHONY: all _build clean test test_add test_multiply test_shmem test_nccl test_basic test_blas run run-main run-flash help
+.PHONY: all _build clean test test_add test_multiply test_shmem test_nccl test_basic test_blas test_reduce run run-main run-flash help
 
 all: _build
 
@@ -50,6 +51,9 @@ $(BUILDDIR)/basic_test.o: $(SRCDIR)/basic.cu | $(BUILDDIR)
 $(BUILDDIR)/nccl_test.o: $(SRCDIR)/nccl_demo.cu | $(BUILDDIR)
 	$(CUDA) $(CUDAFLAGS) $(NCCLFLAGS) -c $< -o $@
 
+$(BUILDDIR)/reduce_test.o: $(SRCDIR)/reduce.cu | $(BUILDDIR)
+	$(CUDA) $(CUDAFLAGS) -c $< -o $@
+
 # Standalone executable
 $(BUILDDIR)/main: main.cu $(BUILDDIR)/basic.o | $(BUILDDIR)
 	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/basic.o -o $@
@@ -76,6 +80,9 @@ $(TESTDIR)/test_nccl: $(TESTDIR)/test_nccl.cu $(BUILDDIR)/nccl_test.o | $(TESTDI
 
 $(TESTDIR)/test_blas: $(TESTDIR)/test_blas.cu | $(TESTDIR)
 	$(CUDA) $(CUDAFLAGS) $< $(CUBLASFLAGS) -o $@
+
+$(TESTDIR)/test_reduce: $(TESTDIR)/test_reduce.cu $(BUILDDIR)/reduce_test.o | $(TESTDIR)
+	$(CUDA) $(CUDAFLAGS) $< $(BUILDDIR)/reduce_test.o -o $@
 
 clean:
 	rm -rf $(BUILDDIR)
@@ -130,6 +137,11 @@ test_blas:
 	./$(TESTDIR)/test_blas
 	rm -f $(TESTDIR)/test_blas
 
+test_reduce: $(BUILDDIR)/reduce_test.o
+	$(CUDA) $(CUDAFLAGS) $(TESTDIR)/test_reduce.cu $(BUILDDIR)/reduce_test.o -o $(TESTDIR)/test_reduce
+	./$(TESTDIR)/test_reduce
+	rm -f $(TESTDIR)/test_reduce
+
 run: _build
 	@echo "=== Running main ==="
 	./$(BUILDDIR)/main
@@ -151,6 +163,7 @@ help:
 	@echo "  test_basic    - Run single test: basic.cu kernels"
 	@echo "  test_nccl     - Run single test: nccl_demo.cu (broadcast/reduce/allreduce)"
 	@echo "  test_blas     - Run single test: cuBLAS SGEMM"
+	@echo "  test_reduce   - Run single test: reduce.cu max-reduction kernel"
 	@echo "  run_main   - Build and run main.cu"
 	@echo "  clean         - Remove build artifacts"
 	@echo "  run-flash     - Run flash attention benchmark (needs PyTorch)"
