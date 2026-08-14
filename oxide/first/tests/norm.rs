@@ -1,5 +1,5 @@
 use cuda_core::{CudaContext, DeviceBuffer, LaunchConfig};
-use first::norm::{BLOCK_SIZE, norm};
+use first::norm::{norm, BLOCK_SIZE};
 
 /// Row-wise RMSNorm reference: y = x / sqrt(mean(x^2) + epsilon)
 fn reference_rmsnorm(x: &[f32], n_rows: usize, d: usize, epsilon: f32) -> Vec<f32> {

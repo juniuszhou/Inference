@@ -22,6 +22,7 @@ fn test_tensor() -> candle_core::Result<()> {
     let device = Device::Cuda(CudaDevice::new_with_stream(0)?);
 
     let tensor = Tensor::from_vec(vec![1.0f32, 2.0, 3.0, 4.0], (2, 2), &device)?;
+    
     println!("tensor: {:?}", tensor.shape().dims());
     assert_eq!(tensor.shape().dims(), &[2, 2]);
 
