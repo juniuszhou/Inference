@@ -1,2 +1,6 @@
+# Required by tile's `cun`/`cun-compiler` deps (cuda-bindings build script).
+# The workspace root `.cargo/config.toml` sets the same variables for
+# `cargo test --package tile` from the repo root.
 [env]
-CUDA_TOOLKIT_PATH = { value = "/usr/local/cuda-13.3", relative = false }
+CUDA_TOOLKIT_PATH = "/usr/local/cuda-13.3"
+CUTILE_TILEIRAS_PATH = "/usr/local/cuda-13.3/bin/tileiras"
