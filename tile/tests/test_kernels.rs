@@ -1,22 +1,8 @@
+use crate::with_test_stack;
 use cutile::half::f16;
 use cutile::prelude::*;
 use std::sync::Arc;
 use tile::kernels;
-
-const TEST_STACK_SIZE: usize = 8_000_000;
-
-fn with_test_stack<F, R>(f: F) -> R
-where
-    F: FnOnce() -> R + Send + 'static,
-    R: Send + 'static,
-{
-    std::thread::Builder::new()
-        .stack_size(TEST_STACK_SIZE)
-        .spawn(f)
-        .expect("Failed to spawn test thread")
-        .join()
-        .expect("Test thread panicked")
-}
 
 #[test]
 fn test_gemm_f16() {
@@ -24,7 +10,7 @@ fn test_gemm_f16() {
         let (m, n, k) = (1024usize, 1024usize, 1024usize);
         // Tile sizes must divide M/N/K. These match cutile's GEMM examples;
         // BM=BN=BK=1024 would be a single oversized MMA tile.
-        let (bm, bn, bk) = (16usize, 16usize, 8usize);
+        let (bm, bn, bk) = (16usize, 16usize, 16usize);
         let generics = vec![
             bm.to_string(),
             bn.to_string(),

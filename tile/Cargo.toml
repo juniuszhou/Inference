@@ -2,6 +2,11 @@
 name = "tile"
 version = "0.1.0"
 edition = "2024"
+autotests = false
+
+[[test]]
+name = "tests"
+path = "tests/mod.rs"
 
 [dependencies]
 tokio = { version = "1.39.0", features = ["full"] }
