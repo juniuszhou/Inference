@@ -24,7 +24,6 @@ pub mod kernels {
             let tile_x: Tile<f32, { [BM, BK] }> = convert_tile(tile_x);
             let tile_y: Tile<f32, { [BK, BN] }> = convert_tile(tile_y);
             tile_z = mma(tile_x, tile_y, tile_z);
-            continue;
         }
         let tile_z: Tile<f16, { [BM, BN] }> = convert_tile(tile_z);
         z.store(tile_z);
@@ -59,5 +58,36 @@ pub mod kernels {
         let tx: Tile<f32, { [B] }> = part_x.load([pid.0]); // Tile is GPU shared memory within the same SM
         let ty: Tile<f32, { [B] }> = part_y.load([pid.0]);
         z.store(tx + ty);
+    }
+
+    unsafe fn load_f16_ptr(
+        ptrs: &Tensor<i64, { [-1] }>,
+        group_id: i32,
+    ) -> PointerTile<*mut f16, { [] }> {
+        let one_shape: Shape<{ [1] }> = Shape::<{ [1] }> { dims: &[] };
+        // partition with single dimension and just one element in each group/partition
+        let ptr_part: Partition<i64, { [1] }> = ptrs.partition(one_shape);
+        let ptr_int: Tile<i64, { [1] }> = ptr_part.load([group_id]);
+        let ptr_int: Tile<i64, { [] }> = ptr_int.reshape(const_shape![]);
+        // convert the integer to a pointer
+        let ptr: PointerTile<*mut f16, { [] }> = int_to_ptr(ptr_int);
+        // assume the pointer is divisible by 16, make sure the pointer is aligned to 2 bytes
+        unsafe { assume_div_by::<_, 16>(ptr) }
+    }
+
+    #[cutile::entry()]
+    unsafe fn copy_via_load_f16_ptr<const B: i32>(
+        z: &mut Tensor<f16, { [B] }>, // output tensor
+        ptrs: &Tensor<i64, { [-1] }>,
+        group_id: i32, // the group id of the pointers
+        len: i32,      // the length of the pointers
+    ) {
+        let pid = get_tile_block_id().0;
+        let ptr = unsafe { load_f16_ptr(ptrs, group_id) };
+        let shape: Shape<{ [-1] }> = Shape::<{ [-1] }> { dims: &[len] };
+        let strides: Array<{ [-1] }> = Array::<{ [-1] }> { dims: &[1i32] };
+        let src: Tensor<f16, { [-1] }> =
+            unsafe { make_tensor_view(ptr, shape, strides, new_token_unordered()) };
+        z.store(src.partition(const_shape![B]).load([pid]));
     }
 }
