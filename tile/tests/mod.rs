@@ -14,4 +14,8 @@ where
 }
 
 mod test_add;
+mod test_add_2d;
+mod test_argmax;
+mod test_embedding;
 mod test_kernels;
+mod test_reduce;
